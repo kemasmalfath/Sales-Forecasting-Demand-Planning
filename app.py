@@ -11,7 +11,8 @@ app = Flask(__name__)
 @app.route('/')
 def index():
     # ===== LOAD DATA =====
-    data_path = os.path.join('data', 'sales_data.csv')
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+    data_path = os.path.join(BASE_DIR, 'data', 'sales_data.csv')
     if not os.path.exists(data_path):
         return "Data tidak ditemukan. Jalankan generate_data.py terlebih dahulu."
 
