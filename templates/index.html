@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sales Forecasting & Demand Planning — Dashboard</title>
+    <meta name="description" content="Dashboard peramalan penjualan ritel menggunakan Holt-Winters Exponential Smoothing.">
+    <script src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<div class="app">
+
+    <!-- ===== HEADER ===== -->
+    <header class="header fade-up">
+        <div class="header__left">
+            <div class="header__icon"><i class="fas fa-chart-line"></i></div>
+            <div>
+                <div class="header__title">Sales Forecasting & Demand Planning</div>
+                <div class="header__subtitle">Holt-Winters Exponential Smoothing — Dashboard Analitik</div>
+            </div>
+        </div>
+        <div class="header__badge">
+            <i class="fas fa-circle"></i> Model Aktif
+        </div>
+    </header>
+
+    <!-- ===== DATA INFO BAR ===== -->
+    <div class="data-bar fade-up delay-1">
+        <div class="data-bar__item">
+            <i class="fas fa-database"></i>
+            <span>Total Data: <b>{{ insights.data_points }} titik data</b></span>
+        </div>
+        <div class="data-bar__item">
+            <i class="fas fa-calendar"></i>
+            <span>Rentang: <b>{{ insights.date_range }}</b></span>
+        </div>
+        <div class="data-bar__item">
+            <i class="fas fa-cog"></i>
+            <span>Algoritma: <b>Holt-Winters (Additive)</b></span>
+        </div>
+        <div class="data-bar__item">
+            <i class="fas fa-bullseye"></i>
+            <span>Horizon: <b>30 hari ke depan</b></span>
+        </div>
+    </div>
+
+    <!-- ===== KPI CARDS ===== -->
+    <div class="kpi-row">
+        <div class="kpi fade-up delay-1">
+            <div class="kpi__label"><i class="fas fa-database"></i> Total Penjualan Historis</div>
+            <div class="kpi__value">{{ insights.total_historical }}</div>
+            <div class="kpi__sub">Rata-rata {{ insights.avg_daily }} unit/hari</div>
+        </div>
+        <div class="kpi fade-up delay-2">
+            <div class="kpi__label"><i class="fas fa-bullseye"></i> Prediksi 30 Hari</div>
+            <div class="kpi__value">{{ insights.total_predicted }}</div>
+            <div class="kpi__sub">Rata-rata {{ insights.avg_predicted }} unit/hari</div>
+        </div>
+        <div class="kpi fade-up delay-3">
+            <div class="kpi__label"><i class="fas fa-arrow-trend-up"></i> Tren Penjualan</div>
+            <div class="kpi__value">{{ insights.trend_dir }} {{ insights.trend_pct }}%</div>
+            <div class="kpi__trend kpi__trend--{{ 'up' if insights.trend_dir == 'Naik' else 'down' }}">
+                <i class="fas fa-arrow-{{ 'up' if insights.trend_dir == 'Naik' else 'down' }}"></i>
+                vs 30 hari terakhir
+            </div>
+        </div>
+        <div class="kpi fade-up delay-4">
+            <div class="kpi__label"><i class="fas fa-crosshairs"></i> Akurasi Model (MAPE)</div>
+            <div class="kpi__value">{{ insights.mape }}%</div>
+            <div class="kpi__sub">Error rata-rata prediksi</div>
+        </div>
+    </div>
+
+    <!-- ===== MAIN CHART ===== -->
+    <div class="grid-main fade-up delay-4">
+        <div class="card">
+            <div class="card__header">
+                <div class="card__title">
+                    <span class="card__title-dot" style="background: var(--blue)"></span>
+                    Grafik Penjualan & Prediksi 30 Hari
+                </div>
+                <span class="card__tag">90 Hari Terakhir + Forecast</span>
+            </div>
+            <div class="card__body">
+                <div id="mainChart" class="chart-container"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== SECONDARY CHARTS ===== -->
+    <div class="grid-2 fade-up delay-5">
+        <!-- Weekly Pattern -->
+        <div class="card">
+            <div class="card__header">
+                <div class="card__title">
+                    <span class="card__title-dot" style="background: var(--purple)"></span>
+                    Pola Mingguan (Rata-rata per Hari)
+                </div>
+                <span class="card__tag">Seasonality</span>
+            </div>
+            <div class="card__body">
+                <div id="weeklyChart" class="chart-container-sm"></div>
+            </div>
+        </div>
+
+        <!-- Monthly Trend -->
+        <div class="card">
+            <div class="card__header">
+                <div class="card__title">
+                    <span class="card__title-dot" style="background: var(--orange)"></span>
+                    Tren Bulanan (12 Bulan Terakhir)
+                </div>
+                <span class="card__tag">Trend</span>
+            </div>
+            <div class="card__body">
+                <div id="monthlyChart" class="chart-container-sm"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== MODEL METRICS + INSIGHTS ===== -->
+    <div class="grid-3 fade-up delay-6">
+        <!-- Insights -->
+        <div class="card">
+            <div class="card__header">
+                <div class="card__title">
+                    <span class="card__title-dot" style="background: var(--green)"></span>
+                    Insight Bisnis & Rekomendasi
+                </div>
+            </div>
+            <div class="card__body">
+                <div class="insight">
+                    <div class="insight__icon insight__icon--blue"><i class="fas fa-chart-pie"></i></div>
+                    <div>
+                        <div class="insight__title">Analisis Tren</div>
+                        <div class="insight__text">
+                            Model memproyeksikan tren <b>{{ insights.trend_dir }} {{ insights.trend_pct }}%</b>
+                            dibandingkan 30 hari sebelumnya. 
+                            {% if insights.trend_dir == 'Naik' %}
+                            Ini menandakan momentum positif yang perlu dipertahankan.
+                            {% else %}
+                            Perlu strategi promosi untuk mengembalikan volume penjualan.
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                <div class="insight">
+                    <div class="insight__icon insight__icon--orange"><i class="fas fa-calendar-check"></i></div>
+                    <div>
+                        <div class="insight__title">Puncak Penjualan</div>
+                        <div class="insight__text">
+                            Hari dengan rata-rata penjualan tertinggi: <b>{{ insights.peak_day }}</b>.
+                            Hari terendah: <b>{{ insights.low_day }}</b>.
+                            Prediksi tanggal puncak bulan depan: <b>{{ insights.peak_forecast_date }}</b> ({{ insights.peak_forecast_value }} unit).
+                        </div>
+                    </div>
+                </div>
+                <div class="insight">
+                    <div class="insight__icon insight__icon--green"><i class="fas fa-boxes-stacked"></i></div>
+                    <div>
+                        <div class="insight__title">Rekomendasi Stok</div>
+                        <div class="insight__text">
+                            {% if insights.trend_dir == 'Naik' %}
+                            Tingkatkan stok <b>15-20%</b> menjelang hari <b>{{ insights.peak_day }}</b> untuk mengantisipasi lonjakan permintaan. Alokasikan lebih banyak SDM di hari-hari ramai.
+                            {% else %}
+                            Kurangi pemesanan stok dan fokus pada promosi <i>flash sale</i> di hari <b>{{ insights.low_day }}</b> untuk meningkatkan volume.
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                <div class="insight">
+                    <div class="insight__icon insight__icon--purple"><i class="fas fa-calendar-days"></i></div>
+                    <div>
+                        <div class="insight__title">Performa Musiman</div>
+                        <div class="insight__text">
+                            Bulan dengan penjualan tertinggi: <b>{{ insights.best_month }}</b>.
+                            Bulan terendah: <b>{{ insights.worst_month }}</b>.
+                            Gunakan data ini untuk perencanaan kampanye tahunan.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Model Evaluation -->
+        <div class="card">
+            <div class="card__header">
+                <div class="card__title">
+                    <span class="card__title-dot" style="background: var(--blue)"></span>
+                    Evaluasi Model
+                </div>
+                <span class="card__tag">Accuracy</span>
+            </div>
+            <div class="card__body">
+                <div class="metrics-row">
+                    <div class="metric">
+                        <div class="metric__value">{{ insights.mae }}</div>
+                        <div class="metric__label">MAE</div>
+                        <div class="metric__desc">Mean Absolute Error</div>
+                    </div>
+                    <div class="metric">
+                        <div class="metric__value">{{ insights.rmse }}</div>
+                        <div class="metric__label">RMSE</div>
+                        <div class="metric__desc">Root Mean Squared Error</div>
+                    </div>
+                    <div class="metric">
+                        <div class="metric__value">{{ insights.mape }}%</div>
+                        <div class="metric__label">MAPE</div>
+                        <div class="metric__desc">Mean Absolute % Error</div>
+                    </div>
+                </div>
+
+                <div class="insight" style="margin-top: 1rem">
+                    <div class="insight__icon insight__icon--blue"><i class="fas fa-flask"></i></div>
+                    <div>
+                        <div class="insight__title">Metodologi</div>
+                        <div class="insight__text">
+                            Model dilatih menggunakan <b>Holt-Winters Exponential Smoothing</b> (additive trend + additive seasonality, periode 7 hari).
+                            Data dibagi <b>700:30</b> (train:test) untuk validasi. Metrik di atas dihitung pada 30 hari data uji yang tidak pernah dilihat oleh model.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== FOOTER ===== -->
+    <footer class="footer">
+        Dibangun dengan Python, Flask, Pandas & Plotly —
+        <a href="https://github.com/kemasmalfath" target="_blank">Kemas Muhammad Alfath Iskandar</a>
+    </footer>
+
+</div>
+
+<!-- ===== PLOTLY SCRIPTS ===== -->
+<script>
+const D = {{ plot_data | safe }};
+const fontCfg = { family: 'Inter, sans-serif', color: '#6b7280', size: 12 };
+const gridColor = '#f3f4f6';
+const cfg = { responsive: true, displayModeBar: false };
+
+// ===== MAIN CHART =====
+Plotly.newPlot('mainChart', [
+    {
+        x: D.hist_dates, y: D.hist_sales,
+        type: 'scatter', mode: 'lines',
+        name: 'Penjualan Aktual',
+        line: { color: '#2563eb', width: 1.5, shape: 'spline' },
+        fill: 'tozeroy',
+        fillcolor: 'rgba(37, 99, 235, 0.06)',
+        hovertemplate: '<b>%{x}</b><br>Aktual: %{y} unit<extra></extra>'
+    },
+    {
+        x: [D.hist_dates[D.hist_dates.length-1], D.pred_dates[0]],
+        y: [D.hist_sales[D.hist_sales.length-1], D.pred_sales[0]],
+        type: 'scatter', mode: 'lines',
+        showlegend: false,
+        line: { color: '#d1d5db', width: 2, dash: 'dash' },
+        hoverinfo: 'skip'
+    },
+    {
+        x: D.pred_dates, y: D.pred_sales,
+        type: 'scatter', mode: 'lines+markers',
+        name: 'Prediksi 30 Hari',
+        line: { color: '#ea580c', width: 2.5, dash: 'dot', shape: 'spline' },
+        marker: { size: 5, color: '#ea580c', line: { color: '#fff', width: 1.5 } },
+        fill: 'tozeroy',
+        fillcolor: 'rgba(234, 88, 12, 0.06)',
+        hovertemplate: '<b>%{x}</b><br>Prediksi: %{y:.0f} unit<extra></extra>'
+    }
+], {
+    paper_bgcolor: 'transparent', plot_bgcolor: 'transparent',
+    font: fontCfg,
+    margin: { t: 16, l: 48, r: 16, b: 48 },
+    xaxis: {
+        showgrid: false, zeroline: false, tickfont: { size: 11 },
+        rangeslider: { visible: true, thickness: 0.06, bgcolor: '#f8f9fb', bordercolor: '#e5e7eb' }
+    },
+    yaxis: {
+        showgrid: true, gridcolor: gridColor, zeroline: false, tickfont: { size: 11 },
+        title: { text: 'Unit Terjual', font: { size: 11, color: '#9ca3af' } }
+    },
+    legend: { orientation: 'h', y: 1.06, x: 0, font: { size: 12 } },
+    hovermode: 'x unified',
+    hoverlabel: { bgcolor: '#111827', font: { family: 'Inter', color: '#fff', size: 13 }, bordercolor: '#ea580c' },
+    shapes: [{
+        type: 'line',
+        x0: D.hist_dates[D.hist_dates.length-1], x1: D.hist_dates[D.hist_dates.length-1],
+        y0: 0, y1: 1, yref: 'paper',
+        line: { color: '#ea580c', width: 1, dash: 'dashdot' }
+    }],
+    annotations: [{
+        x: D.hist_dates[D.hist_dates.length-1], y: 1, yref: 'paper',
+        text: 'Mulai Prediksi', showarrow: false,
+        font: { size: 10, color: '#ea580c' }, xanchor: 'right', xshift: -6, yshift: 4,
+        bgcolor: 'rgba(255,255,255,0.9)', borderpad: 4
+    }]
+}, cfg);
+
+// ===== WEEKLY CHART =====
+Plotly.newPlot('weeklyChart', [{
+    x: D.weekly_labels, y: D.weekly_values,
+    type: 'bar',
+    marker: {
+        color: D.weekly_values.map((v, i) =>
+            v === Math.max(...D.weekly_values) ? '#7c3aed' : 'rgba(124, 58, 237, 0.25)'
+        ),
+        line: { color: '#7c3aed', width: 1 }
+    },
+    hovertemplate: '%{x}: <b>%{y:.0f} unit</b><extra></extra>'
+}], {
+    paper_bgcolor: 'transparent', plot_bgcolor: 'transparent',
+    font: fontCfg,
+    margin: { t: 8, l: 44, r: 8, b: 36 },
+    xaxis: { showgrid: false, tickfont: { size: 11 } },
+    yaxis: { showgrid: true, gridcolor: gridColor, zeroline: false, tickfont: { size: 11 } },
+    hoverlabel: { bgcolor: '#111827', font: { family: 'Inter', color: '#fff', size: 13 } },
+    bargap: 0.35
+}, cfg);
+
+// ===== MONTHLY CHART =====
+Plotly.newPlot('monthlyChart', [{
+    x: D.monthly_labels, y: D.monthly_values,
+    type: 'scatter', mode: 'lines+markers',
+    line: { color: '#ea580c', width: 2, shape: 'spline' },
+    marker: {
+        size: 7,
+        color: D.monthly_values.map((v, i) =>
+            v === Math.max(...D.monthly_values) ? '#ea580c' : '#fff'
+        ),
+        line: { color: '#ea580c', width: 2 }
+    },
+    fill: 'tozeroy',
+    fillcolor: 'rgba(234, 88, 12, 0.06)',
+    hovertemplate: '%{x}: <b>%{y:,} unit</b><extra></extra>'
+}], {
+    paper_bgcolor: 'transparent', plot_bgcolor: 'transparent',
+    font: fontCfg,
+    margin: { t: 8, l: 52, r: 8, b: 36 },
+    xaxis: { showgrid: false, tickangle: -45, tickfont: { size: 10 } },
+    yaxis: { showgrid: true, gridcolor: gridColor, zeroline: false, tickfont: { size: 11 } },
+    hoverlabel: { bgcolor: '#111827', font: { family: 'Inter', color: '#fff', size: 13 } }
+}, cfg);
+</script>
+</body>
+</html>
