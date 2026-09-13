@@ -2,8 +2,6 @@
 
 > **Time-Series Forecasting** untuk memprediksi penjualan ritel 30 hari ke depan menggunakan **Holt-Winters Exponential Smoothing**, divisualisasikan dalam dashboard web interaktif berbasis **Flask & Plotly**.
 
---
-'
 ## 🧠 Apa Itu Proyek Ini?
 
 Bayangkan Anda adalah **manajer sebuah toko ritel**. Setiap hari, Anda mencatat berapa banyak barang yang terjual. Setelah 2 tahun, Anda memiliki **730 hari data penjualan**.
